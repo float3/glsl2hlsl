@@ -9,15 +9,13 @@ jobs:
       image: rustlang/rust:nightly
     runs-on: ubuntu-latest
 
-
-
     steps:
       - name: Install Dependencies
         run: |
           curl -sL https://deb.nodesource.com/setup_14.x | bash - \
                 && apt-get install -y nodejs
           curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-          
+
       - name: Checkout
         uses: actions/checkout@v2
 
@@ -36,10 +34,3 @@ jobs:
           name: website
           path: |
             glsl2hlsl-wasm/www/dist/
-
-      - name: Trigger Github Pages
-        uses: peter-evans/repository-dispatch@v1
-        with:
-          token: ${{ secrets.PEMA_ACCESS_TOKEN }}
-          event-type: update-glsl2hlsl-website
-          repository: pema99/pema99.github.io
