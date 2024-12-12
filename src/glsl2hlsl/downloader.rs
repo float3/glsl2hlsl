@@ -1,8 +1,8 @@
 use serde::Deserialize;
 
-use crate::transpile;
 use crate::add_buffer_num;
 use crate::reset_buffer_num;
+use crate::transpile;
 use crate::BUFFER_NUM;
 
 #[derive(Deserialize, Debug)]
@@ -28,7 +28,7 @@ struct ShaderRenderPass {
     code: String,
     name: String,
     r#type: String,
-}   
+}
 
 #[derive(Deserialize, Debug)]
 struct ShaderInput {
@@ -49,16 +49,14 @@ struct ShaderSampler {
 pub struct ShaderFile {
     pub name: String,
     pub contents: String,
-}  
+}
 
 #[derive(Clone)]
 pub enum ShaderType {
     MainImage(String, Option<String>, Vec<(usize, String)>),
     Buffer(usize, String),
-    Common(String)
+    Common(String),
 }
-
-
 
 pub fn download_shader(id: &str) -> Result<Shader, ureq::Error> {
     let url = format!("https://www.shadertoy.com/api/v1/shaders/{}?key=NtHtMm", id);
@@ -86,48 +84,87 @@ fn generate_guid(shader: &Shader) -> String {
 //     }
 // }
 
-
 pub fn get_common(shader: &Shader) -> Option<String> {
-    shader.renderpass.iter()
-    .find(|ri| ri.r#type == "common")
-    .map(|rp| transpile(rp.code.clone(), false, false, ShaderType::Common(format!("{}{}",shader.info.name.clone(), rp.name.clone()))))
+    shader.renderpass.iter().find(|ri| ri.r#type == "common").map(|rp| {
+        transpile(
+            rp.code.clone(),
+            false,
+            false,
+            ShaderType::Common(format!("{}{}", shader.info.name.clone(), rp.name.clone())),
+        )
+    })
 }
 
 pub fn get_buffers(shader: &Shader) -> Vec<(usize, String)> {
-    shader.renderpass.iter()
-    .filter(|ri| ri.r#type == "buffer")
-    .map(|rp| {
-            let mm = (unsafe{BUFFER_NUM},transpile(rp.code.clone(), false, false, ShaderType::Buffer(unsafe {BUFFER_NUM}, rp.name.clone())));
+    shader
+        .renderpass
+        .iter()
+        .filter(|ri| ri.r#type == "buffer")
+        .map(|rp| {
+            let mm = (
+                unsafe { BUFFER_NUM },
+                transpile(
+                    rp.code.clone(),
+                    false,
+                    false,
+                    ShaderType::Buffer(unsafe { BUFFER_NUM }, rp.name.clone()),
+                ),
+            );
             add_buffer_num();
             mm
-        }
-    )
-    .collect()
+        })
+        .collect()
 }
 
-pub fn get_shader_file(shader: &Shader, extract_props: bool, raymarch: bool, common: Option<String>, buffers: Vec<(usize, String)>) -> Vec<ShaderFile> {
-    shader.renderpass.iter()
-    .filter(|ri| ri.r#type == "image")
-    .map(|rp| ShaderFile {
-        name: format!("{}.shader", shader.info.name.clone()),
-        contents: transpile(rp.code.clone(), extract_props, raymarch, ShaderType::MainImage(format!("{}{}",shader.info.name.clone(), rp.name.clone()),common.clone(), buffers.clone()))
-    })
-    .collect()
+pub fn get_shader_file(
+    shader: &Shader,
+    extract_props: bool,
+    raymarch: bool,
+    common: Option<String>,
+    buffers: Vec<(usize, String)>,
+) -> Vec<ShaderFile> {
+    shader
+        .renderpass
+        .iter()
+        .filter(|ri| ri.r#type == "image")
+        .map(|rp| ShaderFile {
+            name: format!("{}.shader", shader.info.name.clone()),
+            contents: transpile(
+                rp.code.clone(),
+                extract_props,
+                raymarch,
+                ShaderType::MainImage(
+                    format!("{}{}", shader.info.name.clone(), rp.name.clone()),
+                    common.clone(),
+                    buffers.clone(),
+                ),
+            ),
+        })
+        .collect()
 }
 
 //Need to verify that this works first.
 pub fn get_image_files(shader: &Shader) -> Vec<ShaderFile> {
     //TODO: Set up cors proxy for images.
-    shader.renderpass.iter().flat_map(|rp| {
-        rp.inputs.iter()
-        .filter(|inp| inp.ctype == "texture")
-        .map(|inp| ShaderFile {
-            name: format!("iChannel{} {}.{}",  rp.name, inp.channel, inp.src.chars().skip_while(|&c| c != '.').collect::<String>()),
-            contents: format!("https://www.shadertoy.com{}", inp.src),
+    shader
+        .renderpass
+        .iter()
+        .flat_map(|rp| {
+            rp.inputs
+                .iter()
+                .filter(|inp| inp.ctype == "texture")
+                .map(|inp| ShaderFile {
+                    name: format!(
+                        "iChannel{} {}.{}",
+                        rp.name,
+                        inp.channel,
+                        inp.src.chars().skip_while(|&c| c != '.').collect::<String>()
+                    ),
+                    contents: format!("https://www.shadertoy.com{}", inp.src),
+                })
+                .collect::<Vec<_>>()
         })
-        .collect::<Vec<_>>()
-    })
-    .collect()     
+        .collect()
 }
 
 pub fn get_shader_meta_file(shader: &Shader, guid: &String) -> ShaderFile {
@@ -172,9 +209,7 @@ ShaderImporter:
     }
 }
 
-
-
-fn get_material_file(name: &String, shader_guid: &String, buffers: Vec<(usize, String)> ) -> ShaderFile {
+fn get_material_file(name: &String, shader_guid: &String, buffers: Vec<(usize, String)>) -> ShaderFile {
     let content = format!(
         "%YAML 1.1
 %TAG !u! tag:unity3d.com,2011:
@@ -224,8 +259,10 @@ Material:
     - _Mouse: {{r: 0.5, g: 0.5, b: 0.5, a: 0.5}}
 ",
         shader_guid,
-        buffers.iter().map(
-            |(i,_)| format!("- _MainTex_{}:
+        buffers
+            .iter()
+            .map(|(i, _)| format!(
+                "- _MainTex_{}:
         m_Texture: {{fileID: 0}}
         m_Scale: {{x: 1, y: 1}}
         m_Offset: {{x: 0, y: 0}}
@@ -240,11 +277,11 @@ Material:
     - _FourthTex_{}:
         m_Texture: {{fileID: 0}}
         m_Scale: {{x: 1, y: 1}}
-        m_Offset: {{x: 0, y: 0}}", i, i, i, i
-            )
-        )
-        .collect::<Vec<_>>()
-        .concat()
+        m_Offset: {{x: 0, y: 0}}",
+                i, i, i, i
+            ))
+            .collect::<Vec<_>>()
+            .concat()
     );
 
     ShaderFile {
@@ -253,10 +290,9 @@ Material:
     }
 }
 
-
 fn get_crt_file(shader_name: &String, shader_guid: &String, id: &usize) -> ShaderFile {
     let content = format!(
-"%YAML 1.1  
+        "%YAML 1.1  
 %TAG !u! tag:unity3d.com,2011:
 --- !u!86 &8600000
 CustomRenderTexture:
@@ -373,9 +409,8 @@ CustomRenderTexture:
   m_CubemapFaceMask: 4294967295
   m_DoubleBuffered: 1
   m_WrapUpdateZones: 0
-",      id,  
-        shader_guid,
-        id
+",
+        id, shader_guid, id
     );
 
     ShaderFile {
@@ -386,9 +421,7 @@ CustomRenderTexture:
 
 pub fn test_file(shader: &Shader, extract_props: bool, raymarch: bool) -> Vec<(usize, String)> {
     get_buffers(shader)
-
 }
-
 
 pub fn get_files(shader: &Shader, extract_props: bool, raymarch: bool) -> Vec<ShaderFile> {
     let shader_guid = generate_guid(shader);
@@ -400,12 +433,20 @@ pub fn get_files(shader: &Shader, extract_props: bool, raymarch: bool) -> Vec<Sh
     let mut shader_files = get_shader_file(shader, extract_props, raymarch, common, buffers.clone());
     let shader_meta_file = get_shader_meta_file(shader, &shader_guid.clone());
     let mat_file = get_material_file(&shader.info.name.clone(), &shader_guid.clone(), buffers.clone());
-    let mut other_mat_files : Vec<ShaderFile> = buffers.iter()
-                            .map(|(n, _)| get_material_file(&format!("{} Buffer{}", shader.info.name.clone(),n),&shader_guid.clone(), buffers.clone()))
-                            .collect();
-    let mut crt_files : Vec<ShaderFile> = buffers.iter()
-                            .map(|(n, _)| get_crt_file(&shader.info.name.clone(),&shader_guid.clone(), n))
-                            .collect();
+    let mut other_mat_files: Vec<ShaderFile> = buffers
+        .iter()
+        .map(|(n, _)| {
+            get_material_file(
+                &format!("{} Buffer{}", shader.info.name.clone(), n),
+                &shader_guid.clone(),
+                buffers.clone(),
+            )
+        })
+        .collect();
+    let mut crt_files: Vec<ShaderFile> = buffers
+        .iter()
+        .map(|(n, _)| get_crt_file(&shader.info.name.clone(), &shader_guid.clone(), n))
+        .collect();
     let mut other_files = vec![shader_meta_file, mat_file];
     shader_files.append(&mut other_files);
     shader_files.append(&mut crt_files);

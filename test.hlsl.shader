@@ -10,7 +10,8 @@ Shader "Converted/Template"
         _Mouse ("Mouse", Vector) = (0.5, 0.5, 0.5, 0.5)
         [ToggleUI] _GammaCorrect ("Gamma Correction", Float) = 1
         _Resolution ("Resolution (Change if AA is bad)", Range(1, 1024)) = 1
-
+        _ResolutionX ("ResolutionX", Range(1, 10)) = 1
+        _ResolutionY ("ResolutionY", Range(1, 10)) = 1
         [Header(Raymarching)]
         [ToggleUI] _WorldSpace ("World Space Marching", Float) = 0
         _Offset ("Offset (W=Scale)", Vector) = (0, 0, 0, 1)
@@ -26,8 +27,10 @@ Shader "Converted/Template"
     }
     SubShader
     {
+
         Pass
         {
+            Name "MainImage"
             Cull Off
 
             CGPROGRAM
@@ -55,21 +58,27 @@ Shader "Converted/Template"
             sampler2D _SecondTex; float4 _SecondTex_TexelSize;
             sampler2D _ThirdTex;  float4 _ThirdTex_TexelSize;
             sampler2D _FourthTex; float4 _FourthTex_TexelSize;
+
             float4 _Mouse;
             float _GammaCorrect;
             float _Resolution;
+            float _ResolutionX;
+            float _ResolutionY;                        
             float _WorldSpace;
             float4 _Offset;
 
-            // GLSL Compatability macros
-            #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
-            #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
-            #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
-            #define iResolution float3(_Resolution, _Resolution, _Resolution)
-            #define iFrame (floor(_Time.y / 60))
-            #define iChannelTime float4(_Time.y, _Time.y, _Time.y, _Time.y)
-            #define iDate float4(2020, 6, 18, 30)
-            #define iSampleRate (44100)
+            // GLSL Compatability macros   
+            #ifndef COMMON_INCLUDE_BLOCK
+            #define COMMON_INCLUDE_BLOCK
+                #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
+                #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
+                #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
+                #define iResolution float3(_ResolutionX, _ResolutionY, _Resolution)
+                #define iFrame (floor(_Time.y / 60))
+                #define iChannelTime float4(_Time.y, _Time.y, _Time.y, _Time.y)
+                #define iDate float4(2020, 6, 18, 30)
+                #define iSampleRate (44100)
+            #endif    
             #define iChannelResolution float4x4(                      \
                 _MainTex_TexelSize.z,   _MainTex_TexelSize.w,   0, 0, \
                 _SecondTex_TexelSize.z, _SecondTex_TexelSize.w, 0, 0, \
@@ -300,7 +309,7 @@ float detail;
             {
                 vertex_output = __vertex_output;
                 float4 fragColor = 0;
-                float2 fragCoord = vertex_output.uv * _Resolution;
+                float2 fragCoord = vertex_output.uv * iResolution;
                 float2 uv = fragCoord.xy/iResolution.xy*2.-1.;
                 float2 oriuv = uv;
                 uv.y *= iResolution.y/iResolution.x;

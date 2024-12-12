@@ -24,7 +24,12 @@ extern "C" {
 
 #[wasm_bindgen]
 pub fn transpile(input: String, extract_props: bool, raymarch: bool) -> String {
-    glsl2hlsl::transpile(input, extract_props, raymarch, ShaderType::MainImage(format!("main"), None, vec![]))
+    glsl2hlsl::transpile(
+        input,
+        extract_props,
+        raymarch,
+        ShaderType::MainImage("main".to_string(), None, vec![]),
+    )
 }
 
 #[wasm_bindgen]
@@ -41,5 +46,4 @@ pub fn download(json: String, extract_props: bool, raymarch: bool) {
             download_image(&f.name, &f.contents);
         }
     }
-    
 }

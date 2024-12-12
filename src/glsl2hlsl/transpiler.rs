@@ -3,17 +3,16 @@ use std::fmt::Write;
 use glsl::parser::Parse as _;
 use glsl::syntax::*;
 
+use super::downloader::ShaderType;
 use super::preprocessor::*;
 use super::typechecker::*;
-use super::downloader::ShaderType;
-
 
 pub fn transpile(input: String, extract_props: bool, raymarch: bool, option: ShaderType) -> String {
     clear_sym();
     // Preprocessor step
-    
+
     let (glsl, defs, mut props) = process_macros(input, extract_props);
-    
+
     let mut stage = ShaderStage::parse(glsl);
     match &mut stage {
         Err(a) => a.info.clone(),
@@ -22,19 +21,24 @@ pub fn transpile(input: String, extract_props: bool, raymarch: bool, option: Sha
             props.append(&mut globals);
 
             let mut s = String::new();
-            match &option{
-                ShaderType::MainImage(title,common,buffers) => {
+            match &option {
+                ShaderType::MainImage(title, common, buffers) => {
                     if raymarch {
-                        show_translation_unit_raymarch(&mut s, &stage, props,title.clone(),common.clone(),buffers.clone());
+                        show_translation_unit_raymarch(
+                            &mut s,
+                            stage,
+                            props,
+                            title.clone(),
+                            common.clone(),
+                            buffers.clone(),
+                        );
                     } else {
-                        show_translation_unit(&mut s, &stage, props, title.clone(),common.clone(),buffers.clone());
+                        show_translation_unit(&mut s, stage, props, title.clone(), common.clone(), buffers.clone());
                     }
-                },
-                ShaderType::Buffer(id, _) => {
-                    show_translation_unit_buffer(&mut s, &stage, props, id.clone())
-                },
-                ShaderType::Common(_) => show_translation_unit_common(&mut s, &stage, props),
-                _ => panic!() 
+                }
+                ShaderType::Buffer(id, _) => show_translation_unit_buffer(&mut s, stage, props, *id),
+                ShaderType::Common(_) => show_translation_unit_common(&mut s, stage, props),
+                _ => panic!(),
             }
 
             replace_macros(s, defs)
@@ -49,7 +53,7 @@ pub static mut BUFFER_NUM: usize = 0;
 // fn set_buffer_num(i: i32) {
 //     unsafe {
 //         match i {
-//             0 => BUFFER_NUM = "_0", 
+//             0 => BUFFER_NUM = "_0",
 //             1 => BUFFER_NUM = "_1",
 //             2 => BUFFER_NUM = "_2",
 //             _ => BUFFER_NUM = "",
@@ -57,16 +61,16 @@ pub static mut BUFFER_NUM: usize = 0;
 //     }
 // }
 
-fn get_buffer_num(text : String) -> String {
-   unsafe { match 
-        BUFFER_NUM {
-            1 => format!("{}_1",text),
-            2 => format!("{}_2",text),
-            3 => format!("{}_3",text),
-            4 => format!("{}_4",text),
+fn get_buffer_num(text: String) -> String {
+    unsafe {
+        match BUFFER_NUM {
+            1 => format!("{}_1", text),
+            2 => format!("{}_2", text),
+            3 => format!("{}_3", text),
+            4 => format!("{}_4", text),
             _ => "idk".to_string(),
         }
-    } 
+    }
 }
 
 pub fn add_buffer_num() {
@@ -159,40 +163,43 @@ where
         "iTime" => "_Time.y",
         "iTimeDelta" => "unity_DeltaTime.x",
         "iChannel0" => {
-            match unsafe{BUFFER_NUM} {
-                1..=4 => write!(s, "_MainTex_{}", unsafe{BUFFER_NUM}).unwrap(),
-                _ =>  write!(s, "_MainTex").unwrap()
+            match unsafe { BUFFER_NUM } {
+                1..=4 => write!(s, "_MainTex_{}", unsafe { BUFFER_NUM }).unwrap(),
+                _ => write!(s, "_MainTex").unwrap(),
             }
             s.as_str()
-        },
+        }
         "iChannel1" => {
-            match unsafe{BUFFER_NUM} {
-                1..=4 => write!(s, "_SecondTex_{}", unsafe{BUFFER_NUM}).unwrap(),
-                _ =>  write!(s, "_SecondTex").unwrap()
+            match unsafe { BUFFER_NUM } {
+                1..=4 => write!(s, "_SecondTex_{}", unsafe { BUFFER_NUM }).unwrap(),
+                _ => write!(s, "_SecondTex").unwrap(),
             }
             s.as_str()
-        },
+        }
         "iChannel2" => {
-            match unsafe{BUFFER_NUM} {
-                1..=4 => write!(s, "_ThirdTex_{}", unsafe{BUFFER_NUM}).unwrap(),
-                _ =>  write!(s, "_ThirdTex").unwrap()
+            match unsafe { BUFFER_NUM } {
+                1..=4 => write!(s, "_ThirdTex_{}", unsafe { BUFFER_NUM }).unwrap(),
+                _ => write!(s, "_ThirdTex").unwrap(),
             }
             s.as_str()
-        },
+        }
         "iChannel3" => {
-            match unsafe{BUFFER_NUM} {
-                1..=4 => write!(s, "_FourthTex_{}", unsafe{BUFFER_NUM}).unwrap(),
-                _ =>  write!(s, "_FourthTex").unwrap()
-            }       
-            s.as_str()
-        },
-        "gl_FragCoord" => {
-            match unsafe{BUFFER_NUM} {
-                1..=4 => write!(s, "(vertex_output_{}.globalTexcoord.xy * iResolution)", unsafe{BUFFER_NUM}).unwrap(),
-                _ =>  write!(s, "(vertex_output_{}.uv * _Resolution)", unsafe{BUFFER_NUM}).unwrap()
+            match unsafe { BUFFER_NUM } {
+                1..=4 => write!(s, "_FourthTex_{}", unsafe { BUFFER_NUM }).unwrap(),
+                _ => write!(s, "_FourthTex").unwrap(),
             }
             s.as_str()
-        },
+        }
+        "gl_FragCoord" => {
+            match unsafe { BUFFER_NUM } {
+                1..=4 => write!(s, "(vertex_output_{}.globalTexcoord.xy * iResolution)", unsafe {
+                    BUFFER_NUM
+                })
+                .unwrap(),
+                _ => write!(s, "(vertex_output_{}.uv * _Resolution)", unsafe { BUFFER_NUM }).unwrap(),
+            }
+            s.as_str()
+        }
         "iMouse" => "_Mouse",
 
         //iResolution, iFrame, iChannelTime, iChannelResolution, iMouse, iDate, iSampleRate
@@ -1928,12 +1935,17 @@ where
     }
 }
 
-fn show_translation_unit<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>, title: String, common: Option<String>, buffers: Vec<(usize, String)>)
-where
+fn show_translation_unit<F>(
+    f: &mut F,
+    tu: &TranslationUnit,
+    props: Vec<ShaderProp>,
+    title: String,
+    common: Option<String>,
+    buffers: Vec<(usize, String)>,
+) where
     F: Write,
 {
-           
-    let _ = f.write_str(&format!(r#"Shader "Converted/{}""#,title).to_string());
+    let _ = f.write_str(&format!(r#"Shader "Converted/{}""#, title).to_string());
     let _ = f.write_str(
         "
 {
@@ -1943,30 +1955,34 @@ where
         _MainTex (\"iChannel0\", 2D) = \"white\" {}
         _SecondTex (\"iChannel1\", 2D) = \"white\" {}
         _ThirdTex (\"iChannel2\", 2D) = \"white\" {}
-        _FourthTex (\"iChannel3\", 2D) = \"white\" {}\n");
+        _FourthTex (\"iChannel3\", 2D) = \"white\" {}\n",
+    );
 
-        let m = buffers.iter()
-        .map(|(i, _)| format!("\n
+    let m = buffers
+        .iter()
+        .map(|(i, _)| {
+            format!(
+                "\n
             _MainTex_{} (\"Buffer {} iChannel0\", 2D) = \"white\" {{}}
             _SecondTex_{} (\"Buffer {} iChannel1\", 2D) = \"white\" {{}}
             _ThirdTex_{} (\"Buffer {} iChannel2\", 2D) = \"white\" {{}}
-            _FourthTex_{} (\"Buffer {} iChannel3\", 2D) = \"white\" {{}}\n",i,i,i,i,i,i,i,i
-            ))
+            _FourthTex_{} (\"Buffer {} iChannel3\", 2D) = \"white\" {{}}\n",
+                i, i, i, i, i, i, i, i
+            )
+        })
         .collect::<Vec<_>>()
         .concat();
-            
-        let _ = f.write_str(&m);
 
-        let _ = f.write_str("
+    let _ = f.write_str(&m);
+
+    let _ = f.write_str(
+        "
         _Mouse (\"Mouse\", Vector) = (0.5, 0.5, 0.5, 0.5)
         [ToggleUI] _GammaCorrect (\"Gamma Correction\", Float) = 1
         _Resolution (\"Resolution (Change if AA is bad)\", Range(1, 1024)) = 1
         _ResolutionX (\"ResolutionX\", Range(1, 10)) = 1
-        _ResolutionY (\"ResolutionY\", Range(1, 10)) = 1",        
+        _ResolutionY (\"ResolutionY\", Range(1, 10)) = 1",
     );
-
-
-    
 
     // Add props
     if !props.is_empty() {
@@ -1989,10 +2005,12 @@ where
         let _ = f.write_str(comman.as_str());
     }
 
-    let _ = f.write_str("
+    let _ = f.write_str(
+        "
     SubShader
     {
-");
+",
+    );
 
     let m = buffers.iter()
     .map( 
@@ -2025,8 +2043,8 @@ where
                     #define iResolution float3(_CustomRenderTextureWidth, _CustomRenderTextureHeight, _Resolution)
                 #endif
                 // GLSL Compatability macros
-                #ifndef COMMAN_INCLUDE_BLOCK
-                #define COMMAN_INCLUDE_BLOCK
+                #ifndef COMMON_INCLUDE_BLOCK
+                #define COMMON_INCLUDE_BLOCK
                     #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
                     #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
                     #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
@@ -2047,12 +2065,11 @@ where
             ", i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,b))
     .collect::<Vec<_>>()
     .concat();
-    
-    
+
     let _ = f.write_str(m.as_str());
 
-
-    let _ = f.write_str("
+    let _ = f.write_str(
+        "
         Pass
         {
             CGPROGRAM
@@ -2077,9 +2094,10 @@ where
             sampler2D _MainTex;   float4 _MainTex_TexelSize;
             sampler2D _SecondTex; float4 _SecondTex_TexelSize;
             sampler2D _ThirdTex;  float4 _ThirdTex_TexelSize;
-            sampler2D _FourthTex; float4 _FourthTex_TexelSize;");
+            sampler2D _FourthTex; float4 _FourthTex_TexelSize;",
+    );
 
-            let _ = f.write_str("\n
+    let _ = f.write_str("\n
             float4 _Mouse;
             float _GammaCorrect;
             float _Resolution;
@@ -2175,19 +2193,15 @@ where
     );
 }
 
-
-
 fn show_translation_unit_common<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>)
 where
     F: Write,
-{       
-    let _ = f.write_str(
-        "        CGINCLUDE\n",
-    );
+{
+    let _ = f.write_str("        CGINCLUDE\n");
 
     let _ = f.write_str("
-    #ifndef COMMAN_INCLUDE_BLOCK
-    #define COMMAN_INCLUDE_BLOCK
+    #ifndef COMMON_INCLUDE_BLOCK
+    #define COMMON_INCLUDE_BLOCK
         #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
         #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
         #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
@@ -2201,26 +2215,22 @@ where
     for ed in &(tu.0).0 {
         match ed {
             ExternalDeclaration::FunctionDefinition(fdef) => {
-
-                    show_external_declaration(f, ed, &props);
-
+                show_external_declaration(f, ed, &props);
             }
             _ => show_external_declaration(f, ed, &props),
         };
     }
 
-    let _ = f.write_str(
-        "        ENDCG",
-    );
+    let _ = f.write_str("        ENDCG");
 }
 
 fn show_translation_unit_buffer<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>, bufferId: usize)
 where
     F: Write,
-{       
+{
     //ayyyy lmao??
     let _ = f.write_str(&format!("static v2f_customrendertexture vertex_output_{};\n", bufferId).clone());
-    
+
     for ed in &(tu.0).0 {
         match ed {
             ExternalDeclaration::FunctionDefinition(fdef) => {
@@ -2242,14 +2252,17 @@ where
                     let _ = f.write_str("{\n");
                     add_indent();
                     let _ = f.write_str(get_indent().as_str());
-                    
+
                     let _ = f.write_str(&format!("vertex_output_{}", bufferId).clone());
                     let _ = f.write_str(" = __vertex_output;\n");
                     let _ = f.write_str(get_indent().as_str());
                     let _ = f.write_fmt(format_args!("float4 {} = 0;\n", frag));
                     let _ = f.write_str(get_indent().as_str());
-                        
-                    let _ = f.write_fmt(format_args!("float2 {} = vertex_output_{}.globalTexcoord.xy * iResolution.xy;\n", uv, bufferId));
+
+                    let _ = f.write_fmt(format_args!(
+                        "float2 {} = vertex_output_{}.globalTexcoord.xy * iResolution.xy;\n",
+                        uv, bufferId
+                    ));
                     for st in &fdef.statement.statement_list {
                         show_statement(f, st, true);
                     }
@@ -2259,7 +2272,7 @@ where
                     sub_indent();
                     let _ = f.write_str(get_indent().as_str());
                     let _ = f.write_str("}\n");
-                    
+
                     pop_sym();
                 } else {
                     show_external_declaration(f, ed, &props);
@@ -2268,16 +2281,20 @@ where
             _ => show_external_declaration(f, ed, &props),
         };
     }
-    
 }
 
-
 //crt shader needs another translation unit
-fn show_translation_unit_raymarch<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>, title: String, common: Option<String>, buffers: Vec<(usize, String)>)
-where
+fn show_translation_unit_raymarch<F>(
+    f: &mut F,
+    tu: &TranslationUnit,
+    props: Vec<ShaderProp>,
+    title: String,
+    common: Option<String>,
+    buffers: Vec<(usize, String)>,
+) where
     F: Write,
 {
-    let _ = f.write_str(&format!(r#"Shader "Converted/{}""#,title).to_string());
+    let _ = f.write_str(&format!(r#"Shader "Converted/{}""#, title).to_string());
     let _ = f.write_str(
         "
 {
@@ -2287,21 +2304,29 @@ where
         _MainTex (\"iChannel0\", 2D) = \"white\" {}
         _SecondTex (\"iChannel1\", 2D) = \"white\" {}
         _ThirdTex (\"iChannel2\", 2D) = \"white\" {}
-        _FourthTex (\"iChannel3\", 2D) = \"white\" {}");
+        _FourthTex (\"iChannel3\", 2D) = \"white\" {}",
+    );
 
-        let m = buffers.iter()
-        .map(|(i, _)| format!("\n
+    let m = buffers
+        .iter()
+        .map(|(i, _)| {
+            format!(
+                "\n
             _MainTex_{} (\"Buffer {} iChannel0\", 2D) = \"white\" {{}}
             _SecondTex_{} (\"Buffer {} iChannel1\", 2D) = \"white\" {{}}
             _ThirdTex_{} (\"Buffer {} iChannel2\", 2D) = \"white\" {{}}
-            _FourthTex_{} (\"Buffer {} iChannel3\", 2D) = \"white\" {{}}\n",i,i,i,i,i,i,i,i
-            ))
+            _FourthTex_{} (\"Buffer {} iChannel3\", 2D) = \"white\" {{}}\n",
+                i, i, i, i, i, i, i, i
+            )
+        })
         .collect::<Vec<_>>()
         .concat();
-            
-        let _ = f.write_str(&m);
 
-        let _ = f.write_str("_Mouse (\"Mouse\", Vector) = (0.5, 0.5, 0.5, 0.5)
+    let _ = f.write_str(&m);
+
+    let _ = f.write_str(
+        "
+        _Mouse (\"Mouse\", Vector) = (0.5, 0.5, 0.5, 0.5)
         [ToggleUI] _GammaCorrect (\"Gamma Correction\", Float) = 1
         _Resolution (\"Resolution (Change if AA is bad)\", Range(1, 1024)) = 1
         _ResolutionX (\"ResolutionX\", Range(1, 10)) = 1
@@ -2330,10 +2355,12 @@ where
     if let Some(comman) = common {
         let _ = f.write_str(comman.as_str());
     }
-    let _ = f.write_str("
+    let _ = f.write_str(
+        "
     SubShader
     {
-");
+",
+    );
     let m = buffers.iter()
     .map( 
         |(i, b)| format!("\n
@@ -2364,8 +2391,8 @@ where
                     #define iResolution float3(_CustomRenderTextureWidth, _CustomRenderTextureHeight, _Resolution)
                 #endif
                 // GLSL Compatability macros   
-                #ifndef COMMAN_INCLUDE_BLOCK
-                #define COMMAN_INCLUDE_BLOCK
+                #ifndef COMMON_INCLUDE_BLOCK
+                #define COMMON_INCLUDE_BLOCK
                     #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
                     #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
                     #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
@@ -2387,12 +2414,11 @@ where
             ", i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,i,b))
     .collect::<Vec<_>>()
     .concat();
-    
-    
+
     let _ = f.write_str(m.as_str());
 
-
-    let _ = f.write_str("
+    let _ = f.write_str(
+        "
         Pass
         {
             Name \"MainImage\"
@@ -2422,9 +2448,10 @@ where
             sampler2D _MainTex;   float4 _MainTex_TexelSize;
             sampler2D _SecondTex; float4 _SecondTex_TexelSize;
             sampler2D _ThirdTex;  float4 _ThirdTex_TexelSize;
-            sampler2D _FourthTex; float4 _FourthTex_TexelSize;");
+            sampler2D _FourthTex; float4 _FourthTex_TexelSize;",
+    );
 
-            let _ = f.write_str("\n
+    let _ = f.write_str("\n
             float4 _Mouse;
             float _GammaCorrect;
             float _Resolution;
@@ -2434,8 +2461,8 @@ where
             float4 _Offset;
 
             // GLSL Compatability macros   
-            #ifndef COMMAN_INCLUDE_BLOCK
-            #define COMMAN_INCLUDE_BLOCK
+            #ifndef COMMON_INCLUDE_BLOCK
+            #define COMMON_INCLUDE_BLOCK
                 #define glsl_mod(x,y) (((x)-(y)*floor((x)/(y))))
                 #define texelFetch(ch, uv, lod) tex2Dlod(ch, float4((uv).xy * ch##_TexelSize.xy + ch##_TexelSize.xy * 0.5, 0, lod))
                 #define textureLod(ch, uv, lod) tex2Dlod(ch, float4(uv, 0, lod))
@@ -2475,7 +2502,7 @@ where
             }
 
 ");
-reset_buffer_num();
+    reset_buffer_num();
     for ed in &(tu.0).0 {
         match ed {
             ExternalDeclaration::FunctionDefinition(fdef) => {
