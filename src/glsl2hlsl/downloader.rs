@@ -421,6 +421,8 @@ CustomRenderTexture:
 }
 
 pub fn test_file(shader: &Shader, extract_props: bool, raymarch: bool) -> Vec<(usize, String)> {
+    let _ = raymarch;
+    let _ = extract_props;
     get_buffers(shader)
 }
 

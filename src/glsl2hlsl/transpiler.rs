@@ -38,7 +38,6 @@ pub fn transpile(input: String, extract_props: bool, raymarch: bool, option: Sha
                 }
                 ShaderType::Buffer(id, _) => show_translation_unit_buffer(&mut s, stage, props, *id),
                 ShaderType::Common(_) => show_translation_unit_common(&mut s, stage, props),
-                _ => panic!(),
             }
 
             replace_macros(s, defs)
