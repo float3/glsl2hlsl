@@ -2,7 +2,8 @@
   "name": "glsl2hlsl-wasm",
   "version": "0.1.0",
   "description": "glsl2hlsl",
-  "main": "index.js",
+  "main": "bootstrap.js",
+  "type": "module",
   "bin": {
     "create-wasm-app": ".bin/create-wasm-app.js"
   },
@@ -12,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/rustwasm/create-wasm-app.git"
+    "url": "git+https://github.com/float3/float3.github.io.git"
   },
   "keywords": [
     "webassembly",
@@ -30,10 +31,11 @@
     "glsl2hlsl-wasm": "file:../pkg"
   },
   "devDependencies": {
-    "hello-wasm-pack": "^0.1.0",
+    "copy-webpack-plugin": "^12.0.2",
+    "terser-webpack-plugin": "^5.3.10",
+    "typescript": "^5.7.2",
     "webpack": "^5.97.1",
     "webpack-cli": "^5.1.4",
-    "webpack-dev-server": "^5.2.0",
-    "copy-webpack-plugin": "^12.0.2"
+    "webpack-dev-server": "^5.2.0"
   }
 }

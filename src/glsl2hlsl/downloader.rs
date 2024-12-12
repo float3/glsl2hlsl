@@ -58,6 +58,7 @@ pub enum ShaderType {
     Common(String),
 }
 
+#[cfg(feature = "downloader")]
 pub fn download_shader(id: &str) -> Result<Shader, ureq::Error> {
     let url = format!("https://www.shadertoy.com/api/v1/shaders/{}?key=NtHtMm", id);
     let shader = ureq::get(&url).call()?.into_json::<ShaderContainer>()?.Shader;

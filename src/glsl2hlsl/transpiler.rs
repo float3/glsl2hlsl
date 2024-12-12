@@ -2214,7 +2214,7 @@ where
     ");
     for ed in &(tu.0).0 {
         match ed {
-            ExternalDeclaration::FunctionDefinition(fdef) => {
+            ExternalDeclaration::FunctionDefinition(_fdef) => {
                 show_external_declaration(f, ed, &props);
             }
             _ => show_external_declaration(f, ed, &props),
@@ -2224,12 +2224,12 @@ where
     let _ = f.write_str("        ENDCG");
 }
 
-fn show_translation_unit_buffer<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>, bufferId: usize)
+fn show_translation_unit_buffer<F>(f: &mut F, tu: &TranslationUnit, props: Vec<ShaderProp>, buffer_id: usize)
 where
     F: Write,
 {
     //ayyyy lmao??
-    let _ = f.write_str(&format!("static v2f_customrendertexture vertex_output_{};\n", bufferId).clone());
+    let _ = f.write_str(&format!("static v2f_customrendertexture vertex_output_{};\n", buffer_id).clone());
 
     for ed in &(tu.0).0 {
         match ed {
@@ -2253,7 +2253,7 @@ where
                     add_indent();
                     let _ = f.write_str(get_indent().as_str());
 
-                    let _ = f.write_str(&format!("vertex_output_{}", bufferId).clone());
+                    let _ = f.write_str(&format!("vertex_output_{}", buffer_id).clone());
                     let _ = f.write_str(" = __vertex_output;\n");
                     let _ = f.write_str(get_indent().as_str());
                     let _ = f.write_fmt(format_args!("float4 {} = 0;\n", frag));
@@ -2261,7 +2261,7 @@ where
 
                     let _ = f.write_fmt(format_args!(
                         "float2 {} = vertex_output_{}.globalTexcoord.xy * iResolution.xy;\n",
-                        uv, bufferId
+                        uv, buffer_id
                     ));
                     for st in &fdef.statement.statement_list {
                         show_statement(f, st, true);
